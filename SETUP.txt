@@ -1,0 +1,115 @@
+FENR SETUP GUIDE
+=================
+"Unleash Your Voice"
+
+PHASE 1: Supabase (Database + Auth)
+-------------------------------------
+1. Go to https://supabase.com → create a free account/project
+2. SQL Editor → paste and run: supabase/schema.sql
+3. SQL Editor → paste and run: supabase/schema_phase2.sql
+4. Authentication > Providers > Email
+   - DISABLE "Confirm email" for easy local testing (re-enable before sharing)
+5. Settings > API → copy:
+   - Project URL
+   - anon/public key
+   - service_role key (keep secret)
+
+
+PHASE 2: Supabase Storage (file uploads)
+------------------------------------------
+1. Supabase dashboard → Storage → New Bucket
+2. Name: fenr-attachments
+3. Public: YES (toggle on)
+4. File size limit: 25MB
+5. Save
+
+
+PHASE 3: Backend Setup
+-----------------------
+1. cd backend
+2. cp .env.example .env
+3. Fill in .env:
+   SUPABASE_URL=       (project URL)
+   SUPABASE_SERVICE_KEY= (service_role key)
+   FRONTEND_URL=http://localhost:5173
+   PORT=3001
+
+4. npm install
+5. npm run dev
+   → 🐺 FENR backend running on port 3001
+
+
+PHASE 4: Frontend Setup
+------------------------
+1. cd frontend
+2. cp .env.example .env
+3. Fill in .env:
+   VITE_SUPABASE_URL=     (same project URL)
+   VITE_SUPABASE_ANON_KEY= (anon/public key)
+
+4. npm install
+5. npm run dev
+   → App at http://localhost:5173
+
+
+PHASE 5: Start Using FENR
+--------------------------
+1. Go to http://localhost:5173
+2. Register your account
+3. Create a Realm (server) → click + in realm strip
+4. Copy the Binding Code → click + next to realm name
+5. Share code with friends → they register and join
+
+
+SHARING WITH FRIENDS
+----------------------
+LAN (same WiFi):
+  - Run `ipconfig`, share http://YOUR_LOCAL_IP:5173
+
+Remote (internet):
+  Option A: Deploy backend to Railway (railway.app) — free tier
+  Option B: Deploy frontend to Vercel (vercel.com) — free tier
+  Option C: Ngrok tunnel — `ngrok http 5173` for instant public URL
+
+
+WHAT'S BUILT (Phases 1+2)
+---------------------------
+✅ Accounts — register, login, logout
+✅ Realms — create, invite with binding codes, join
+✅ Halls — create text channels, navigate between them
+✅ Real-time chat via WebSockets
+✅ Typing indicators
+✅ Message editing (click ✏️ on hover)
+✅ Message deletion (click 🗑️ on hover)
+✅ Emoji reactions (click 😊 on hover, toggle)
+✅ File/image uploads — drag & drop or click + in input
+✅ Link embeds — images and YouTube auto-embed
+✅ FENR brand — Orbitron/Rajdhani fonts, Norse color palette, frosted glass
+
+
+FOLDER STRUCTURE
+-----------------
+discord-clone/
+  backend/         Node.js + Express + Socket.io
+    routes/        auth, servers, channels, messages
+    middleware/    JWT auth
+    server.js      Main server + WebSocket handler
+  frontend/        React + Vite + Tailwind (FENR theme)
+    src/
+      components/
+        auth/      Login, Register
+        realms/    RealmList, CreateRealmModal
+        halls/     HallList
+        chat/      ChatArea, Message, MessageInput, EmojiPicker, LinkEmbed
+        layout/    MainLayout
+        user/      UserPanel
+      context/     AuthContext, SocketContext
+  supabase/        schema.sql, schema_phase2.sql
+  SETUP.txt        This file
+
+
+COMING IN PHASE 3 (Voice & Video)
+-----------------------------------
+- Howls (voice channels) via LiveKit
+- Screen share
+- Video calls

@@ -1,0 +1,98 @@
+FENR DEPLOYMENT GUIDE
+======================
+"Where Packs Become Communities"
+
+So your wife and friends can join from anywhere.
+
+=========================================
+STEP 1 — Deploy Backend to Railway (free)
+=========================================
+1. Go to https://railway.app → sign up with GitHub
+2. Click "New Project" → "Deploy from GitHub repo"
+3. Select your repo (you'll need to push to GitHub first — see bottom)
+4. Railway auto-detects Node.js
+5. Go to project → Variables → add all your env vars:
+   SUPABASE_URL=https://txzgtwvqxqruvkkkynsq.supabase.co
+   SUPABASE_SERVICE_KEY=sb_secret_7OZM5zuhUKF6V4jZ0b75rw__TsGLZgh
+   FRONTEND_URL=https://your-app.vercel.app  ← fill in after step 2
+   PORT=3001
+   LIVEKIT_URL=wss://...
+   LIVEKIT_API_KEY=...
+   LIVEKIT_API_SECRET=...
+6. Railway gives you a URL like: https://fenr-backend.up.railway.app
+7. Copy that URL
+
+
+=========================================
+STEP 2 — Deploy Frontend to Vercel (free)
+=========================================
+1. Go to https://vercel.com → sign up with GitHub
+2. "Add New Project" → import your repo
+3. Set root directory to: discord-clone/frontend
+4. Add environment variables:
+   VITE_SUPABASE_URL=https://txzgtwvqxqruvkkkynsq.supabase.co
+   VITE_SUPABASE_ANON_KEY=sb_publishable_6J-V5qigghtpVgggRrppjQ_13N-a5F7
+5. Deploy → Vercel gives you: https://fenr.vercel.app
+6. Go back to Railway → update FRONTEND_URL to this Vercel URL
+7. Also update vite.config.js proxy target to your Railway URL
+
+
+=========================================
+STEP 3 — Update vite.config.js for prod
+=========================================
+In frontend/vite.config.js, the proxy only works locally.
+For prod, set VITE_BACKEND_URL in Vercel and update API calls, OR
+use a monorepo setup where Vercel proxies to Railway.
+
+Easiest approach: set in frontend .env for Vercel:
+  VITE_API_URL=https://fenr-backend.up.railway.app
+
+
+=========================================
+STEP 4 — LiveKit (Voice & Video) — Free tier
+=========================================
+1. Go to https://livekit.io → Cloud → Sign Up (free: 10k min/month)
+2. Create a project
+3. Copy:
+   - WebSocket URL (wss://your-app.lk.production.livekit.cloud)
+   - API Key
+   - API Secret
+4. Add to Railway env vars:
+   LIVEKIT_URL=wss://...
+   LIVEKIT_API_KEY=...
+   LIVEKIT_API_SECRET=...
+
+
+=========================================
+STEP 5 — Push to GitHub (needed for deploy)
+=========================================
+1. Go to https://github.com → New repo → "fenr"
+2. In your project folder:
+   cd "C:\Users\Brock\OneDrive\Desktop\Master Folder\projects\discord-clone"
+   git init
+   git add .
+   git commit -m "FENR v1.0 — Phases 1-3"
+   git remote add origin https://github.com/YOUR_USERNAME/fenr.git
+   git push -u origin main
+
+3. Then Railway and Vercel can auto-deploy on every push
+
+
+=========================================
+SHARE WITH FRIENDS
+=========================================
+Once deployed, give friends:
+  https://fenr.vercel.app
+
+They register an account, you send them a Binding Code to join your Realm.
+That's it — fully working Discord alternative, free.
+
+
+=========================================
+QUICK TEST (before deploying)
+=========================================
+Want to test with friends right now on your local network?
+1. Find your IP: run `ipconfig` in cmd
+2. Start both servers
+3. In frontend/vite.config.js add: server: { host: true }
+4. Friends on same WiFi visit: http://YOUR_IP:5173
