@@ -23,9 +23,11 @@ router.get('/search', async (req, res) => {
   try {
     const url = `${BASE}/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(q)}&limit=${limit}&rating=g&lang=en`;
     const r = await fetch(url);
-    const json = await r.json();
-    if (json.meta?.status !== 200) {
-      console.error('[GIF search]', json.meta);
+    const text = await r.text();
+    let json;
+    try { json = JSON.parse(text); } catch { console.error('[GIF search] non-JSON:', text.slice(0, 200)); return res.status(500).json({ error: 'GIF search failed' }); }
+    if (!r.ok || json.meta?.status !== 200) {
+      console.error('[GIF search] status', r.status, json.meta);
       return res.status(500).json({ error: 'GIF search failed' });
     }
     res.json(mapResults(json.data));
@@ -38,10 +40,13 @@ router.get('/search', async (req, res) => {
 router.get('/trending', async (req, res) => {
   try {
     const url = `${BASE}/trending?api_key=${GIPHY_KEY}&limit=20&rating=g`;
+    console.log('[GIF trending] key prefix:', GIPHY_KEY.slice(0, 6));
     const r = await fetch(url);
-    const json = await r.json();
-    if (json.meta?.status !== 200) {
-      console.error('[GIF trending]', json.meta);
+    const text = await r.text();
+    let json;
+    try { json = JSON.parse(text); } catch { console.error('[GIF trending] non-JSON:', text.slice(0, 200)); return res.status(500).json({ error: 'Failed to load trending GIFs' }); }
+    if (!r.ok || json.meta?.status !== 200) {
+      console.error('[GIF trending] status', r.status, json.meta);
       return res.status(500).json({ error: 'Failed to load trending GIFs' });
     }
     res.json(mapResults(json.data));
