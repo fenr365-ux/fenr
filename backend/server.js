@@ -235,17 +235,54 @@ io.on('connection', (socket) => {
   });
 
   socket.on('send_dm', async ({ dmChannelId, content, attachments = [] }) => {
-    if (!dmChannelId || !content?.trim()) return;
+    if (!dmChannelId || (!content?.trim() && !attachments?.length)) return;
 
     const { data: message, error } = await supabase
       .from('dm_messages')
-      .insert({ channel_id: dmChannelId, user_id: socket.user.id, content: content.trim(), attachments })
+      .insert({ channel_id: dmChannelId, user_id: socket.user.id, content: content?.trim() || '', attachments: attachments || [] })
       .select('*, profiles(id, username, avatar_url)')
       .single();
 
     if (!error && message) {
-      io.to(`dm:${dmChannelId}`).emit('new_dm', message);
+      io.to(`dm:${dmChannelId}`).emit('new_dm', { ...message, reactions: [] });
     }
+  });
+
+  // DM reactions
+  socket.on('toggle_dm_reaction', async ({ messageId, emoji, dmChannelId }) => {
+    if (!messageId || !emoji) return;
+
+    const { data: existing } = await supabase
+      .from('dm_message_reactions')
+      .select('id')
+      .eq('message_id', messageId)
+      .eq('user_id', socket.user.id)
+      .eq('emoji', emoji)
+      .single();
+
+    if (existing) {
+      await supabase.from('dm_message_reactions').delete().eq('id', existing.id);
+    } else {
+      await supabase.from('dm_message_reactions').insert({ message_id: messageId, user_id: socket.user.id, emoji });
+    }
+
+    const { data: reactions } = await supabase
+      .from('dm_message_reactions')
+      .select('id, emoji, user_id')
+      .eq('message_id', messageId);
+
+    io.to(`dm:${dmChannelId}`).emit('dm_reaction_update', { messageId, reactions: reactions || [] });
+  });
+
+  // DM typing
+  socket.on('dm_typing', async (dmChannelId) => {
+    let username = socket.user.username;
+    if (!username && !socket.user.isBot) {
+      const { data } = await supabase.from('profiles').select('username').eq('id', socket.user.id).single();
+      username = data?.username;
+      socket.user.username = username;
+    }
+    socket.to(`dm:${dmChannelId}`).emit('dm_user_typing', { userId: socket.user.id, username: username || 'Someone' });
   });
 
   // Presence — track online status

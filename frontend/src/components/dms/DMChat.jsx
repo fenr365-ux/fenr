@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
+import MessageInput from '../chat/MessageInput';
+import Message from '../chat/Message';
 
 const PACK_COLORS = ['#4A7AFF', '#4DD1C4', '#FF7A3D', '#FF4D4D', '#9c84ef', '#faa61a'];
 function getColor(username) {
@@ -10,23 +12,44 @@ function getColor(username) {
   return PACK_COLORS[Math.abs(h)];
 }
 
-function formatTimestamp(dateStr) {
-  const date = new Date(dateStr);
-  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const diffDays = Math.floor((Date.now() - date) / 86400000);
-  if (diffDays === 0) return `Today at ${time}`;
-  if (diffDays === 1) return `Yesterday at ${time}`;
-  return `${date.toLocaleDateString()} at ${time}`;
+function DateDivider({ date }) {
+  const now = new Date();
+  const d = new Date(date);
+  const diffDays = Math.floor((now - d) / 86400000);
+  const label = diffDays === 0 ? 'Today' : diffDays === 1 ? 'Yesterday'
+    : d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+  return (
+    <div className="date-divider">
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function TypingIndicator({ users }) {
+  if (!users.size) return null;
+  return (
+    <div className="flex items-center gap-2 px-14 py-1">
+      <div className="flex items-center gap-0.5">
+        <span className="typing-dot" />
+        <span className="typing-dot" />
+        <span className="typing-dot" />
+      </div>
+      <span className="text-fenr-muted text-xs italic">
+        {[...users.values()][0]} is typing...
+      </span>
+    </div>
+  );
 }
 
 export default function DMChat({ dm }) {
   const { session } = useAuth();
   const socket = useSocket();
   const [messages, setMessages] = useState([]);
-  const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
+  const [typingUsers, setTypingUsers] = useState(new Map());
   const bottomRef = useRef(null);
   const joinedRef = useRef(null);
+  const typingTimers = useRef({});
 
   const other = dm.user1_id === session.user.id ? dm.user2 : dm.user1;
   const headers = { Authorization: `Bearer ${session.access_token}` };
@@ -34,7 +57,7 @@ export default function DMChat({ dm }) {
   useEffect(() => {
     loadMessages();
     if (socket) {
-      if (joinedRef.current) socket.emit('leave_channel', `dm:${joinedRef.current}`);
+      if (joinedRef.current) socket.emit('leave_dm', joinedRef.current);
       socket.emit('join_dm', dm.id);
       joinedRef.current = dm.id;
     }
@@ -42,11 +65,30 @@ export default function DMChat({ dm }) {
 
   useEffect(() => {
     if (!socket) return;
+
     const onNewDM = (msg) => {
       if (msg.channel_id === dm.id) setMessages(prev => [...prev, msg]);
     };
+    const onReaction = ({ messageId, reactions }) => {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reactions } : m));
+    };
+    const onTyping = ({ userId, username }) => {
+      setTypingUsers(prev => { const m = new Map(prev); m.set(userId, username || 'Someone'); return m; });
+      clearTimeout(typingTimers.current[userId]);
+      typingTimers.current[userId] = setTimeout(() => {
+        setTypingUsers(prev => { const m = new Map(prev); m.delete(userId); return m; });
+      }, 3000);
+    };
+
     socket.on('new_dm', onNewDM);
-    return () => socket.off('new_dm', onNewDM);
+    socket.on('dm_reaction_update', onReaction);
+    socket.on('dm_user_typing', onTyping);
+
+    return () => {
+      socket.off('new_dm', onNewDM);
+      socket.off('dm_reaction_update', onReaction);
+      socket.off('dm_user_typing', onTyping);
+    };
   }, [socket, dm.id]);
 
   useEffect(() => {
@@ -61,105 +103,106 @@ export default function DMChat({ dm }) {
     setLoading(false);
   }
 
-  function sendMessage(e) {
-    e.preventDefault();
-    if (!content.trim() || !socket) return;
-    socket.emit('send_dm', { dmChannelId: dm.id, content: content.trim() });
-    setContent('');
+  function sendMessage(content, attachments = []) {
+    if (!socket) return;
+    socket.emit('send_dm', { dmChannelId: dm.id, content, attachments });
   }
 
-  function handleKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (content.trim() && socket) {
-        socket.emit('send_dm', { dmChannelId: dm.id, content: content.trim() });
-        setContent('');
-      }
+  function handleTyping() {
+    socket?.emit('dm_typing', dm.id);
+  }
+
+  function handleReact(messageId, emoji) {
+    socket?.emit('toggle_dm_reaction', { messageId, emoji, dmChannelId: dm.id });
+  }
+
+  // Build list with date dividers
+  const withDividers = [];
+  let lastDate = null;
+  for (const msg of messages) {
+    const day = new Date(msg.created_at).toDateString();
+    if (day !== lastDate) {
+      withDividers.push({ type: 'divider', date: msg.created_at, key: `div-${msg.created_at}` });
+      lastDate = day;
     }
+    withDividers.push({ type: 'msg', msg });
   }
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="h-12 flex items-center gap-3 px-4 border-b flex-shrink-0"
-        style={{ borderColor: 'rgba(74,122,255,0.1)', background: 'rgba(26,29,33,0.8)' }}>
-        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-          style={{ background: getColor(other?.username) }}>
+      <div
+        className="h-12 flex items-center gap-3 px-4 border-b flex-shrink-0"
+        style={{ borderColor: 'rgba(74,122,255,0.1)', background: 'rgba(22,25,29,0.92)', backdropFilter: 'blur(12px)' }}
+      >
+        <div
+          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+          style={{ background: getColor(other?.username), boxShadow: `0 2px 8px ${getColor(other?.username)}44` }}
+        >
           {other?.username?.[0]?.toUpperCase()}
         </div>
         <span className="font-semibold text-fenr-text">{other?.username}</span>
-        <span className="text-fenr-muted text-xs ml-1">· Direct Message</span>
+        <span className="text-fenr-muted text-xs">· Direct Message</span>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto py-2 px-4">
+      <div className="flex-1 overflow-y-auto py-2">
         {loading ? (
-          <div className="flex items-center justify-center h-full text-fenr-muted">
-            <span className="animate-pulse">🐺</span>
+          <div className="flex items-center justify-center h-full text-fenr-muted gap-3">
+            <span className="text-4xl rune-glow">ᚠ</span>
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white"
-              style={{ background: getColor(other?.username) }}>
+          <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-6">
+            <div
+              className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold text-white"
+              style={{ background: `linear-gradient(135deg, ${getColor(other?.username)}88, ${getColor(other?.username)})`, boxShadow: `0 4px 20px ${getColor(other?.username)}44` }}
+            >
               {other?.username?.[0]?.toUpperCase()}
             </div>
-            <p className="text-fenr-text font-semibold">{other?.username}</p>
-            <p className="text-fenr-muted text-sm">This is the beginning of your DM with {other?.username}.</p>
+            <div>
+              <p className="text-fenr-text font-semibold text-lg">{other?.username}</p>
+              <p className="text-fenr-muted text-sm mt-1">
+                This is the beginning of your DM with <strong className="text-fenr-text">{other?.username}</strong>. Say something.
+              </p>
+            </div>
           </div>
         ) : (
-          messages.map((msg, i) => {
-            const showHeader = i === 0 || messages[i - 1]?.user_id !== msg.user_id;
-            const username = msg.profiles?.username || 'Unknown';
-            return (
-              <div key={msg.id} className={`flex gap-3 py-0.5 ${showHeader ? 'mt-4' : ''}`}>
-                <div className="w-8 flex-shrink-0 flex items-start justify-center mt-0.5">
-                  {showHeader && (
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                      style={{ background: getColor(username) }}>
-                      {username[0]?.toUpperCase()}
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  {showHeader && (
-                    <div className="flex items-baseline gap-2 mb-0.5">
-                      <span className="font-semibold text-sm" style={{ color: getColor(username) }}>{username}</span>
-                      <span className="text-fenr-muted text-xs">{formatTimestamp(msg.created_at)}</span>
-                    </div>
-                  )}
-                  <p className="text-fenr-text text-sm leading-relaxed break-words">{msg.content}</p>
-                </div>
-              </div>
-            );
-          })
+          withDividers.map((item, i) =>
+            item.type === 'divider' ? (
+              <DateDivider key={item.key} date={item.date} />
+            ) : (
+              <Message
+                key={item.msg.id}
+                message={item.msg}
+                showHeader={
+                  i === 0 ||
+                  withDividers[i - 1]?.type === 'divider' ||
+                  withDividers[i - 1]?.msg?.user_id !== item.msg.user_id
+                }
+                isOwn={item.msg.user_id === session.user.id}
+                currentUserId={session.user.id}
+                customEmojis={[]}
+                canModerate={false}
+                onDelete={() => {}} // DM delete not wired yet — placeholder
+                onEdit={() => {}}
+                onReact={handleReact}
+                onPin={null}
+                onThread={null}
+              />
+            )
+          )
         )}
+
+        <TypingIndicator users={typingUsers} />
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="px-4 pb-5 flex-shrink-0">
-        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
-          style={{ background: '#2A2F37', border: '1px solid rgba(74,122,255,0.12)' }}>
-          <textarea
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={`Message ${other?.username}`}
-            rows={1}
-            className="flex-1 bg-transparent text-fenr-text placeholder-fenr-muted resize-none outline-none text-sm leading-relaxed"
-            style={{ fontFamily: 'Rajdhani, sans-serif' }}
-          />
-          <button
-            onClick={sendMessage}
-            disabled={!content.trim()}
-            className="text-fenr-muted hover:text-fenr-brand disabled:opacity-30 transition-colors flex-shrink-0"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      <MessageInput
+        hallName={other?.username || 'them'}
+        onSend={sendMessage}
+        onTyping={handleTyping}
+        customEmojis={[]}
+      />
     </div>
   );
 }

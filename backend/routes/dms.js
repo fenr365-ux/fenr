@@ -54,7 +54,7 @@ router.get('/:channelId/messages', authenticateToken, async (req, res) => {
 
   let query = supabase
     .from('dm_messages')
-    .select('*, profiles(id, username, avatar_url)')
+    .select('*, profiles(id, username, avatar_url), reactions:dm_message_reactions(id, emoji, user_id)')
     .eq('channel_id', req.params.channelId)
     .order('created_at', { ascending: false })
     .limit(limit);
