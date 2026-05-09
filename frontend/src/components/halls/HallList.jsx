@@ -50,7 +50,8 @@ export default function HallList({ realm, selectedHall, onSelectHall }) {
     });
     if (res.ok) {
       const data = await res.json();
-      const url = `${window.location.origin}/invite/${data.invite_code}`;
+      const base = import.meta.env.VITE_APP_URL || window.location.origin;
+      const url = `${base}/invite/${data.invite_code}`;
       setInviteCode(url);
       setShowInvite(true);
     }
