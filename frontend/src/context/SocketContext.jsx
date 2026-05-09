@@ -14,8 +14,10 @@ export function SocketProvider({ children }) {
       return;
     }
 
-    const s = io({
-      auth: { token: session.access_token }
+    const BACKEND = import.meta.env.VITE_API_URL || '';
+    const s = io(BACKEND, {
+      auth: { token: session.access_token },
+      transports: ['websocket', 'polling']
     });
 
     s.on('connect', () => console.log('[socket] connected'));

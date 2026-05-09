@@ -17,6 +17,7 @@ import moderationRoutes from './routes/moderation.js';
 import pinsRoutes from './routes/pins.js';
 import searchRoutes from './routes/search.js';
 import gifsRoutes from './routes/gifs.js';
+import friendsRoutes from './routes/friends.js';
 import { handleBuiltinCommand } from './bots/builtinBots.js';
 
 dotenv.config();
@@ -24,14 +25,29 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
-const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-    methods: ['GET', 'POST']
+// Allow FRONTEND_URL (comma-separated list OK) + localhost in dev
+function getAllowedOrigins() {
+  const origins = ['http://localhost:5173', 'http://localhost:4173'];
+  const env = process.env.FRONTEND_URL;
+  if (env) env.split(',').map(u => u.trim()).forEach(u => origins.push(u));
+  return origins;
+}
+
+function corsOrigin(origin, callback) {
+  const allowed = getAllowedOrigins();
+  // Allow vercel.app previews and any configured origin
+  if (!origin || allowed.includes(origin) || /\.vercel\.app$/.test(origin)) {
+    callback(null, true);
+  } else {
+    callback(new Error('Not allowed by CORS'));
   }
+}
+
+const io = new Server(httpServer, {
+  cors: { origin: corsOrigin, methods: ['GET', 'POST'] }
 });
 
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
@@ -46,6 +62,7 @@ app.use('/api/moderation', moderationRoutes);
 app.use('/api/pins', pinsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/gifs', gifsRoutes);
+app.use('/api/friends', friendsRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'FENR' }));
 
