@@ -54,31 +54,35 @@ export default function RealmList({ selectedRealm, onSelectRealm, onSelectDMs, i
       <div className="w-8 h-px" style={{ background: 'rgba(74,122,255,0.2)' }} />
 
       {realms.map(realm => (
-        <button
-          key={realm.id}
-          onClick={() => onSelectRealm(realm)}
-          title={realm.name}
-          className={`relative w-12 h-12 flex items-center justify-center text-xs font-bold transition-all duration-200
-            ${selectedRealm?.id === realm.id
-              ? 'rounded-2xl text-white shadow-glow'
-              : 'rounded-full text-fenr-muted hover:rounded-2xl hover:text-fenr-text'
-            }`}
-          style={{
-            background: selectedRealm?.id === realm.id
-              ? 'linear-gradient(135deg, #4A7AFF, #4DD1C4)'
-              : 'rgba(60,66,74,0.6)',
-            border: selectedRealm?.id === realm.id ? 'none' : '1px solid rgba(74,122,255,0.1)'
-          }}
-        >
-          {realm.icon_url
-            ? <img src={realm.icon_url} alt={realm.name} className="w-12 h-12 rounded-full object-cover" />
-            : getInitials(realm.name)
-          }
-          {/* Active indicator */}
-          {selectedRealm?.id === realm.id && (
-            <span className="absolute -left-1 w-1 h-8 rounded-r bg-fenr-brand" />
-          )}
-        </button>
+        <div key={realm.id} className="relative flex items-center">
+          {/* Active pill */}
+          <span
+            className="absolute -left-1 w-1 rounded-r transition-all duration-200"
+            style={{
+              background: '#4A7AFF',
+              height: selectedRealm?.id === realm.id ? '36px' : '8px',
+              opacity: selectedRealm?.id === realm.id ? 1 : 0
+            }}
+          />
+          <button
+            onClick={() => onSelectRealm(realm)}
+            title={realm.name}
+            className={`realm-icon text-xs font-bold text-white ${selectedRealm?.id === realm.id ? 'active' : ''}`}
+            style={{
+              background: selectedRealm?.id === realm.id
+                ? 'linear-gradient(135deg, #4A7AFF, #4DD1C4)'
+                : 'rgba(50,55,63,0.8)',
+              border: selectedRealm?.id === realm.id ? 'none' : '1px solid rgba(74,122,255,0.12)',
+              color: selectedRealm?.id === realm.id ? 'white' : '#9AA3AF',
+              boxShadow: selectedRealm?.id === realm.id ? '0 4px 16px rgba(74,122,255,0.35)' : 'none'
+            }}
+          >
+            {realm.icon_url
+              ? <img src={realm.icon_url} alt={realm.name} className="w-12 h-12 rounded-full object-cover" />
+              : getInitials(realm.name)
+            }
+          </button>
+        </div>
       ))}
 
       <div className="w-8 h-px mt-1" style={{ background: 'rgba(74,122,255,0.2)' }} />

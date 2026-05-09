@@ -136,8 +136,12 @@ export default function MessageInput({ hallName, onSend, onTyping, customEmojis 
       )}
 
       <div
-        className="flex items-end gap-2 px-3 py-2.5 rounded-xl"
-        style={{ background: '#2A2F37', border: '1px solid rgba(74,122,255,0.12)' }}
+        className="flex items-end gap-2 px-3 py-2.5 rounded-xl transition-all duration-150"
+        style={{
+          background: 'rgba(30,34,40,0.95)',
+          border: '1px solid rgba(74,122,255,0.18)',
+          boxShadow: content ? '0 0 0 2px rgba(74,122,255,0.12)' : 'none'
+        }}
       >
         {/* Attachment button */}
         <button
@@ -145,19 +149,13 @@ export default function MessageInput({ hallName, onSend, onTyping, customEmojis 
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
           title="Upload file"
-          className="text-fenr-muted hover:text-fenr-teal transition-colors flex-shrink-0 mb-0.5 text-xl leading-none"
+          className="text-fenr-muted hover:text-fenr-teal transition-all duration-150 flex-shrink-0 mb-0.5 w-7 h-7 rounded-md flex items-center justify-center hover:bg-fenr-teal/10 text-xl"
         >
           {uploading ? '⏳' : '+'}
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={handleFileSelect}
-        />
+        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} />
 
-        {/* Message input */}
+        {/* Message textarea */}
         <textarea
           ref={textareaRef}
           value={content}
@@ -175,7 +173,7 @@ export default function MessageInput({ hallName, onSend, onTyping, customEmojis 
             type="button"
             onClick={() => { setShowGif(v => !v); setShowEmoji(false); }}
             title="GIF"
-            className="text-fenr-muted hover:text-fenr-teal transition-colors mb-0.5 text-xs font-bold leading-none px-1"
+            className="text-fenr-muted hover:text-fenr-teal transition-all duration-150 mb-0.5 text-[11px] font-bold leading-none px-1.5 py-1 rounded hover:bg-fenr-teal/10"
           >
             GIF
           </button>
@@ -192,7 +190,7 @@ export default function MessageInput({ hallName, onSend, onTyping, customEmojis 
             type="button"
             onClick={() => { setShowEmoji(v => !v); setShowGif(false); }}
             title="Emoji"
-            className="text-fenr-muted hover:text-fenr-orange transition-colors mb-0.5 text-xl leading-none"
+            className="text-fenr-muted hover:text-fenr-orange transition-all duration-150 mb-0.5 w-7 h-7 rounded-md flex items-center justify-center hover:bg-fenr-orange/10 text-lg"
           >
             😊
           </button>
@@ -217,8 +215,10 @@ export default function MessageInput({ hallName, onSend, onTyping, customEmojis 
         </button>
       </div>
 
-      <p className="text-fenr-muted text-xs mt-1 px-1">
-        <strong>Enter</strong> to send · <strong>Shift+Enter</strong> for new line · Drag & drop files to upload
+      <p className="text-fenr-muted text-xs mt-1.5 px-1 flex flex-wrap gap-x-3 gap-y-0.5">
+        <span><kbd className="text-[10px] bg-fenr-active px-1 rounded">Enter</kbd> send</span>
+        <span><kbd className="text-[10px] bg-fenr-active px-1 rounded">Shift+Enter</kbd> newline</span>
+        <span className="hidden sm:inline opacity-60"><strong>**bold**</strong> · <em>*italic*</em> · <code className="text-[10px] text-fenr-teal bg-fenr-active px-1 rounded">`code`</code> · <span>&gt; quote</span></span>
       </p>
     </div>
   );

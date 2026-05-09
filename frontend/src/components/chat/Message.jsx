@@ -1,48 +1,53 @@
 import { useState, useRef, useEffect } from 'react';
+import { marked } from 'marked';
 import EmojiPicker from './EmojiPicker';
 import LinkEmbed, { extractUrls } from './LinkEmbed';
 
-// Renders text with :custom_emoji: replaced by inline images
-function MessageText({ content, customEmojis = [] }) {
-  if (!customEmojis.length) {
-    return <span>{content}</span>;
-  }
-  const emojiMap = Object.fromEntries(customEmojis.map(e => [e.name, e.url]));
-  const parts = content.split(/:([a-z0-9_]+):/g);
-  return (
-    <>
-      {parts.map((part, i) => {
-        if (i % 2 === 1 && emojiMap[part]) {
-          return (
-            <img
-              key={i}
-              src={emojiMap[part]}
-              alt={`:${part}:`}
-              title={`:${part}:`}
-              className="inline-block w-6 h-6 object-contain align-middle mx-0.5"
-            />
-          );
-        }
-        return <span key={i}>{part}</span>;
-      })}
-    </>
-  );
+// Configure marked — safe, no HTML passthrough
+marked.setOptions({ breaks: true, gfm: true });
+
+function renderMarkdown(content) {
+  // Parse inline markdown only — no block-level headings in chat
+  const escaped = content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  let html = escaped
+    // Code blocks ```...```
+    .replace(/```([\s\S]*?)```/g, (_, code) =>
+      `<pre><code>${code.trim()}</code></pre>`)
+    // Inline code `...`
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    // Bold **...**
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Italic *...*  (not touching **)
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+    // Strikethrough ~~...~~
+    .replace(/~~(.+?)~~/g, '<del>$1</del>')
+    // Blockquote > at line start
+    .replace(/^&gt;\s?(.+)$/gm, '<blockquote>$1</blockquote>')
+    // URLs — autolink (skip already-in-tags)
+    .replace(/(?<!href="|">)(https?:\/\/[^\s<>"]+)/g,
+      '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+
+  return html;
 }
 
 const PACK_COLORS = ['#4A7AFF', '#4DD1C4', '#FF7A3D', '#FF4D4D', '#9c84ef', '#faa61a'];
-
 function getPackColor(username) {
   if (!username) return PACK_COLORS[0];
-  let hash = 0;
-  for (const c of username) hash = (hash * 31 + c.charCodeAt(0)) % PACK_COLORS.length;
-  return PACK_COLORS[Math.abs(hash)];
+  let h = 0;
+  for (const c of username) h = (h * 31 + c.charCodeAt(0)) % PACK_COLORS.length;
+  return PACK_COLORS[Math.abs(h)];
 }
 
-function formatTimestamp(dateStr) {
+function formatTimestamp(dateStr, short = false) {
   const date = new Date(dateStr);
   const now = new Date();
   const diffDays = Math.floor((now - date) / 86400000);
   const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (short) return time;
   if (diffDays === 0) return `Today at ${time}`;
   if (diffDays === 1) return `Yesterday at ${time}`;
   return `${date.toLocaleDateString()} at ${time}`;
@@ -53,13 +58,13 @@ function AttachmentDisplay({ attachments }) {
   return (
     <div className="mt-2 flex flex-wrap gap-2">
       {attachments.map((att, i) => {
-        if (att.type?.startsWith('image/')) {
+        if (att.type?.startsWith('image/') || att.name === 'GIF') {
           return (
             <img
               key={i}
               src={att.url}
               alt={att.name}
-              className="max-w-xs max-h-64 rounded-lg object-contain cursor-pointer"
+              className="max-w-xs max-h-64 rounded-xl object-contain cursor-pointer transition-opacity hover:opacity-90"
               style={{ border: '1px solid rgba(74,122,255,0.2)' }}
               onClick={() => window.open(att.url, '_blank')}
             />
@@ -72,11 +77,11 @@ function AttachmentDisplay({ attachments }) {
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-fenr-brand hover:text-blue-400 text-sm transition-colors"
-            style={{ background: 'rgba(74,122,255,0.1)', border: '1px solid rgba(74,122,255,0.2)' }}
+            style={{ background: 'rgba(74,122,255,0.08)', border: '1px solid rgba(74,122,255,0.18)' }}
           >
             <span>📎</span>
             <span className="max-w-48 truncate">{att.name}</span>
-            <span className="text-fenr-muted text-xs">{(att.size / 1024).toFixed(0)}kb</span>
+            {att.size > 0 && <span className="text-fenr-muted text-xs">{(att.size / 1024).toFixed(0)}kb</span>}
           </a>
         );
       })}
@@ -94,6 +99,18 @@ export default function Message({ message, showHeader, isOwn, currentUserId, cus
   const color = getPackColor(username);
   const urls = extractUrls(message.content);
 
+  // Resolve custom emoji :name: in content
+  const emojiMap = Object.fromEntries((customEmojis || []).map(e => [e.name, e.url]));
+  function resolveCustomEmoji(text) {
+    return text.replace(/:([a-z0-9_]+):/g, (match, name) =>
+      emojiMap[name]
+        ? `<img src="${emojiMap[name]}" alt=":${name}:" title=":${name}:" style="display:inline-block;width:22px;height:22px;object-fit:contain;vertical-align:middle;margin:0 1px" />`
+        : match
+    );
+  }
+
+  const renderedHtml = resolveCustomEmoji(renderMarkdown(message.content));
+
   useEffect(() => {
     if (editing && editRef.current) {
       editRef.current.focus();
@@ -102,27 +119,18 @@ export default function Message({ message, showHeader, isOwn, currentUserId, cus
   }, [editing]);
 
   function handleEditKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      submitEdit();
-    }
-    if (e.key === 'Escape') {
-      setEditing(false);
-      setEditContent(message.content);
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitEdit(); }
+    if (e.key === 'Escape') { setEditing(false); setEditContent(message.content); }
   }
 
   function submitEdit() {
     const trimmed = editContent.trim();
-    if (!trimmed || trimmed === message.content) {
-      setEditing(false);
-      return;
-    }
+    if (!trimmed || trimmed === message.content) { setEditing(false); return; }
     onEdit(message.id, trimmed);
     setEditing(false);
   }
 
-  // Group reactions: { emoji: { count, reacted } }
+  // Group reactions
   const reactionMap = {};
   for (const r of message.reactions || []) {
     if (!reactionMap[r.emoji]) reactionMap[r.emoji] = { count: 0, reacted: false };
@@ -132,28 +140,33 @@ export default function Message({ message, showHeader, isOwn, currentUserId, cus
 
   return (
     <div
-      className={`relative flex gap-3 px-4 py-0.5 group transition-colors ${showHeader ? 'mt-4 pt-1' : ''}`}
-      style={{ ':hover': { background: 'rgba(255,255,255,0.02)' } }}
+      className={`msg-row relative flex gap-3 px-4 msg-enter ${showHeader ? 'mt-4 pt-1' : 'pt-0.5'}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); setShowEmojiPicker(false); }}
     >
-      {/* Avatar */}
-      <div className="w-10 flex-shrink-0 flex items-start justify-center mt-0.5">
-        {showHeader && (
+      {/* Avatar column */}
+      <div className="w-10 flex-shrink-0 flex items-start justify-center pt-0.5">
+        {showHeader ? (
           <div
-            className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold select-none"
-            style={{ background: `linear-gradient(135deg, ${color}99, ${color})` }}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold select-none flex-shrink-0"
+            style={{ background: `linear-gradient(135deg, ${color}88, ${color})`, boxShadow: `0 2px 8px ${color}44` }}
           >
             {username[0]?.toUpperCase()}
           </div>
+        ) : (
+          hovered && (
+            <span className="text-fenr-muted text-[10px] leading-none mt-1.5 select-none w-10 text-center">
+              {formatTimestamp(message.created_at, true)}
+            </span>
+          )
         )}
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 pb-0.5">
         {showHeader && (
-          <div className="flex items-baseline gap-2 mb-0.5">
-            <span className="font-semibold text-sm" style={{ color }}>{username}</span>
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="font-semibold text-sm cursor-default" style={{ color }}>{username}</span>
             <span className="text-fenr-muted text-xs">{formatTimestamp(message.created_at)}</span>
             {message.edited && <span className="text-fenr-muted text-xs italic">(edited)</span>}
           </div>
@@ -170,110 +183,111 @@ export default function Message({ message, showHeader, isOwn, currentUserId, cus
               className="fenr-input w-full text-sm resize-none"
             />
             <p className="text-fenr-muted text-xs mt-1">
-              <kbd className="bg-fenr-active px-1 rounded">Enter</kbd> to save ·{' '}
-              <kbd className="bg-fenr-active px-1 rounded">Esc</kbd> to cancel
+              <kbd className="bg-fenr-active px-1.5 rounded text-fenr-text">Enter</kbd> save ·{' '}
+              <kbd className="bg-fenr-active px-1.5 rounded text-fenr-text">Esc</kbd> cancel
             </p>
           </div>
         ) : (
-          <p className="text-fenr-text text-sm leading-relaxed break-words whitespace-pre-wrap">
-            <MessageText content={message.content} customEmojis={customEmojis} />
-          </p>
+          <div
+            className="msg-content text-sm text-fenr-text"
+            dangerouslySetInnerHTML={{ __html: renderedHtml }}
+          />
         )}
 
-        {/* Attachments */}
         <AttachmentDisplay attachments={message.attachments} />
 
-        {/* Link embeds */}
         {!editing && urls.map(url => <LinkEmbed key={url} url={url} />)}
 
         {/* Reactions */}
         {Object.keys(reactionMap).length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5">
+          <div className="flex flex-wrap gap-1 mt-2">
             {Object.entries(reactionMap).map(([emoji, { count, reacted }]) => (
               <button
                 key={emoji}
                 onClick={() => onReact(message.id, emoji)}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-sm transition-all"
-                style={{
-                  background: reacted ? 'rgba(74,122,255,0.2)' : 'rgba(60,66,74,0.5)',
-                  border: `1px solid ${reacted ? 'rgba(74,122,255,0.5)' : 'rgba(74,122,255,0.15)'}`,
-                  color: reacted ? '#4A7AFF' : '#7A8290'
-                }}
+                className={`reaction-pill ${reacted ? 'reacted' : 'unreacted'}`}
               >
                 <span>{emoji}</span>
-                <span className="text-xs font-semibold">{count}</span>
+                <span className="text-xs font-bold">{count}</span>
               </button>
             ))}
           </div>
         )}
+
+        {/* Thread reply count */}
+        {message.reply_count > 0 && !editing && (
+          <button
+            onClick={() => onThread?.(message)}
+            className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-fenr-brand hover:text-fenr-teal transition-colors group"
+          >
+            <span>💬</span>
+            <span>{message.reply_count} {message.reply_count === 1 ? 'reply' : 'replies'}</span>
+            <span className="text-fenr-muted group-hover:text-fenr-teal transition-colors">· View Thread</span>
+          </button>
+        )}
       </div>
 
-      {/* Action bar (hover) */}
+      {/* Hover action bar */}
       {hovered && !editing && (
         <div
-          className="absolute right-4 -top-4 flex items-center gap-1 glass rounded-lg px-1.5 py-1 z-10 shadow-lg"
+          className="absolute right-4 -top-4 flex items-center gap-0.5 rounded-lg px-1 py-1 z-20 shadow-xl slide-up"
+          style={{ background: '#1e2228', border: '1px solid rgba(74,122,255,0.2)' }}
           onMouseEnter={() => setHovered(true)}
         >
           {/* React */}
           <div className="relative">
-            <button
-              onClick={() => setShowEmojiPicker(v => !v)}
-              title="Add Reaction"
-              className="w-7 h-7 rounded hover:bg-fenr-brand/20 flex items-center justify-center text-fenr-muted hover:text-fenr-teal transition-colors text-base"
-            >
-              😊
-            </button>
+            <ActionBtn onClick={() => setShowEmojiPicker(v => !v)} title="Add Reaction" emoji="😊" color="#faa61a" />
             {showEmojiPicker && (
               <div className="absolute right-0 bottom-9 z-50">
                 <EmojiPicker
-                  onSelect={emoji => onReact(message.id, emoji)}
+                  onSelect={emoji => { onReact(message.id, emoji); setShowEmojiPicker(false); }}
                   onClose={() => setShowEmojiPicker(false)}
                 />
               </div>
             )}
           </div>
 
-          {/* Thread reply */}
-          <button
-            onClick={() => onThread?.(message)}
-            title="Reply in Thread"
-            className="w-7 h-7 rounded hover:bg-fenr-brand/20 flex items-center justify-center text-fenr-muted hover:text-fenr-teal transition-colors text-sm"
-          >
-            💬
-          </button>
+          {/* Thread */}
+          <ActionBtn onClick={() => onThread?.(message)} title="Reply in Thread" emoji="💬" color="#4DD1C4" />
 
           {/* Pin */}
-          <button
-            onClick={() => onPin?.(message)}
-            title="Pin Message"
-            className="w-7 h-7 rounded hover:bg-fenr-brand/20 flex items-center justify-center text-fenr-muted hover:text-fenr-orange transition-colors text-sm"
-          >
-            📌
-          </button>
+          <ActionBtn onClick={() => onPin?.(message)} title="Pin Message" emoji="📌" color="#FF7A3D" />
 
-          {/* Edit (own messages only) */}
+          {/* Edit own */}
           {isOwn && (
-            <button
+            <ActionBtn
               onClick={() => { setEditing(true); setEditContent(message.content); }}
               title="Edit Message"
-              className="w-7 h-7 rounded hover:bg-fenr-brand/20 flex items-center justify-center text-fenr-muted hover:text-fenr-text transition-colors text-sm"
-            >
-              ✏️
-            </button>
+              emoji="✏️"
+              color="#9c84ef"
+            />
           )}
 
-          {/* Delete (own or mod) */}
+          {/* Delete own or mod */}
           {(isOwn || canModerate) && (
-            <button
-              onClick={() => onDelete(message.id)}
-              title="Delete Message"
-              className="w-7 h-7 rounded hover:bg-fenr-red/20 flex items-center justify-center text-fenr-muted hover:text-fenr-red transition-colors text-sm"
-            >
-              🗑️
-            </button>
+            <ActionBtn onClick={() => onDelete(message.id)} title="Delete Message" emoji="🗑️" color="#FF4D4D" />
           )}
         </div>
       )}
     </div>
+  );
+}
+
+function ActionBtn({ onClick, title, emoji, color }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      className="w-8 h-8 rounded-md flex items-center justify-center text-base transition-all duration-100"
+      style={{
+        background: hov ? `${color}22` : 'transparent',
+        transform: hov ? 'scale(1.15)' : 'scale(1)',
+      }}
+    >
+      {emoji}
+    </button>
   );
 }

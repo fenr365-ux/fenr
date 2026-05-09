@@ -166,15 +166,10 @@ export default function HallList({ realm, selectedHall, onSelectHall }) {
           <button
             key={hall.id}
             onClick={() => onSelectHall(hall)}
-            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all duration-150 mb-0.5
-              ${selectedHall?.id === hall.id ? 'text-fenr-text' : 'text-fenr-muted hover:text-fenr-text'}`}
-            style={{
-              background: selectedHall?.id === hall.id ? 'rgba(74,122,255,0.15)' : 'transparent',
-              borderLeft: selectedHall?.id === hall.id ? '2px solid #4A7AFF' : '2px solid transparent'
-            }}
+            className={`channel-item w-full text-left mb-0.5 ${selectedHall?.id === hall.id ? 'active' : ''}`}
           >
-            <span className="text-fenr-brand opacity-60 font-bold text-base leading-none">#</span>
-            <span className="truncate">{hall.name}</span>
+            <span className="text-fenr-brand opacity-50 font-bold text-base leading-none select-none">#</span>
+            <span className="truncate flex-1">{hall.name}</span>
           </button>
         ))}
 
@@ -189,15 +184,11 @@ export default function HallList({ realm, selectedHall, onSelectHall }) {
               <button
                 key={hall.id}
                 onClick={() => onSelectHall(hall)}
-                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all duration-150 mb-0.5
-                  ${selectedHall?.id === hall.id ? 'text-fenr-text' : 'text-fenr-muted hover:text-fenr-text'}`}
-                style={{
-                  background: selectedHall?.id === hall.id ? 'rgba(77,209,196,0.15)' : 'transparent',
-                  borderLeft: selectedHall?.id === hall.id ? '2px solid #4DD1C4' : '2px solid transparent'
-                }}
+                className={`channel-item w-full text-left mb-0.5 ${selectedHall?.id === hall.id ? 'active' : ''}`}
+                style={selectedHall?.id === hall.id ? { borderLeftColor: '#4DD1C4', background: 'rgba(77,209,196,0.12)' } : {}}
               >
                 <span className="text-fenr-teal opacity-60 text-base leading-none">🔊</span>
-                <span className="truncate">{hall.name}</span>
+                <span className="truncate flex-1">{hall.name}</span>
               </button>
             ))}
           </div>

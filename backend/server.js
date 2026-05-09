@@ -219,8 +219,14 @@ io.on('connection', (socket) => {
   socket.on('leave_thread', (threadId) => socket.leave(`thread:${threadId}`));
 
   // Typing indicator
-  socket.on('typing', (channelId) => {
-    socket.to(channelId).emit('user_typing', { userId: socket.user.id });
+  socket.on('typing', async (channelId) => {
+    let username = socket.user.username;
+    if (!username && !socket.user.isBot) {
+      const { data } = await supabase.from('profiles').select('username').eq('id', socket.user.id).single();
+      username = data?.username;
+      socket.user.username = username; // cache it
+    }
+    socket.to(channelId).emit('user_typing', { userId: socket.user.id, username: username || 'Someone' });
   });
 
   // DM messaging
