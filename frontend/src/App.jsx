@@ -4,6 +4,7 @@ import { SocketProvider } from './context/SocketContext';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import MainLayout from './components/layout/MainLayout';
+import InvitePage from './components/invite/InvitePage';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -32,6 +33,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+            <Route path="/invite/:code" element={<InvitePage />} />
             <Route path="/*" element={<ProtectedRoute><MainLayout /></ProtectedRoute>} />
           </Routes>
         </BrowserRouter>

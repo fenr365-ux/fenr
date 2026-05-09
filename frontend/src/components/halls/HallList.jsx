@@ -35,7 +35,8 @@ export default function HallList({ realm, selectedHall, onSelectHall }) {
     });
     if (res.ok) {
       const data = await res.json();
-      setInviteCode(data.invite_code);
+      const url = `${window.location.origin}/invite/${data.invite_code}`;
+      setInviteCode(url);
       setShowInvite(true);
     }
   }
@@ -192,7 +193,7 @@ export default function HallList({ realm, selectedHall, onSelectHall }) {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setShowInvite(false)}>
           <div className="glass rounded-xl p-6 w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="font-display text-fenr-text text-lg mb-1">Invite to {realm.name}</h3>
-            <p className="text-fenr-muted text-sm mb-4">Share this Binding Code to let others join your realm</p>
+            <p className="text-fenr-muted text-sm mb-4">Share this link — anyone who clicks it can join your realm</p>
             <div className="flex gap-2">
               <input
                 readOnly

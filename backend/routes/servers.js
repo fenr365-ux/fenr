@@ -83,6 +83,24 @@ router.get('/:id/invite', authenticateToken, async (req, res) => {
   res.json(data);
 });
 
+// Public invite lookup (no auth required)
+router.get('/invite/:code', async (req, res) => {
+  const { data: server, error } = await supabase
+    .from('servers')
+    .select('id, name')
+    .eq('invite_code', req.params.code)
+    .single();
+
+  if (error || !server) return res.status(404).json({ error: 'Invalid invite link' });
+
+  const { count } = await supabase
+    .from('server_members')
+    .select('*', { count: 'exact', head: true })
+    .eq('server_id', server.id);
+
+  res.json({ id: server.id, name: server.name, member_count: count });
+});
+
 // Delete server (owner only)
 router.delete('/:id', authenticateToken, async (req, res) => {
   const { error } = await supabase
