@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import StatusPicker from './StatusPicker';
 
 const PACK_COLORS = ['#4A7AFF', '#4DD1C4', '#FF7A3D', '#FF4D4D', '#9c84ef', '#faa61a'];
 
@@ -13,6 +14,7 @@ function getPackColor(username) {
 export default function UserPanel() {
   const { profile, logout } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const [showStatus, setShowStatus] = useState(false);
   const username = profile?.username || '...';
   const color = getPackColor(username);
 
@@ -28,18 +30,29 @@ export default function UserPanel() {
 
       <div className="flex-1 min-w-0">
         <p className="text-fenr-text text-sm font-semibold truncate leading-tight">{username}</p>
-        <p className="text-fenr-teal text-xs leading-tight flex items-center gap-1">
+        <button
+          onClick={() => { setShowStatus(v => !v); setShowMenu(false); }}
+          className="text-fenr-teal text-xs leading-tight flex items-center gap-1 hover:text-fenr-brand transition-colors"
+        >
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-fenr-teal" />
-          Online
-        </p>
+          Set status
+        </button>
       </div>
 
-      <button onClick={() => setShowMenu(v => !v)} title="Settings" className="text-fenr-muted hover:text-fenr-text transition-colors flex-shrink-0">
+      <button onClick={() => { setShowMenu(v => !v); setShowStatus(false); }} title="Settings" className="text-fenr-muted hover:text-fenr-text transition-colors flex-shrink-0">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
         </svg>
       </button>
 
+      {/* Status picker */}
+      {showStatus && (
+        <div className="absolute bottom-16 left-2 z-50">
+          <StatusPicker onClose={() => setShowStatus(false)} />
+        </div>
+      )}
+
+      {/* Settings menu */}
       {showMenu && (
         <div className="absolute bottom-16 left-2 right-2 glass rounded-xl shadow-2xl py-1 z-50" onClick={() => setShowMenu(false)}>
           <div className="px-3 py-2 border-b" style={{ borderColor: 'rgba(74,122,255,0.1)' }}>

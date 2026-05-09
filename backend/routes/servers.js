@@ -101,6 +101,16 @@ router.get('/invite/:code', async (req, res) => {
   res.json({ id: server.id, name: server.name, member_count: count });
 });
 
+// Get members of a server
+router.get('/:id/members', authenticateToken, async (req, res) => {
+  const { data, error } = await supabase
+    .from('server_members')
+    .select('role, profiles(id, username)')
+    .eq('server_id', req.params.id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data.map(m => ({ ...m.profiles, role: m.role })).filter(Boolean));
+});
+
 // Delete server (owner only)
 router.delete('/:id', authenticateToken, async (req, res) => {
   const { error } = await supabase

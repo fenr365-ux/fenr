@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../context/AuthContext';
 import EmojiPicker from './EmojiPicker';
+import GifPicker from './GifPicker';
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 const BUCKET = 'fenr-attachments';
@@ -12,6 +13,7 @@ export default function MessageInput({ hallName, onSend, onTyping, customEmojis 
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [showGif, setShowGif] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const typingTimer = useRef(null);
   const textareaRef = useRef(null);
@@ -84,6 +86,11 @@ export default function MessageInput({ hallName, onSend, onTyping, customEmojis 
     setContent(prev => prev + (customSrc ? `:${emoji.replace(/:/g, '')}:` : emoji));
     setShowEmoji(false);
     textareaRef.current?.focus();
+  }
+
+  function addGif(url) {
+    onSend('', [{ url, name: 'GIF', type: 'image/gif', size: 0 }]);
+    setShowGif(false);
   }
 
   function submit() {
@@ -162,11 +169,28 @@ export default function MessageInput({ hallName, onSend, onTyping, customEmojis 
           style={{ maxHeight: '144px', fontFamily: 'Rajdhani, sans-serif' }}
         />
 
+        {/* GIF button */}
+        <div className="relative flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => { setShowGif(v => !v); setShowEmoji(false); }}
+            title="GIF"
+            className="text-fenr-muted hover:text-fenr-teal transition-colors mb-0.5 text-xs font-bold leading-none px-1"
+          >
+            GIF
+          </button>
+          {showGif && (
+            <div className="absolute bottom-10 right-0 z-50">
+              <GifPicker onSelect={addGif} onClose={() => setShowGif(false)} />
+            </div>
+          )}
+        </div>
+
         {/* Emoji button */}
         <div className="relative flex-shrink-0">
           <button
             type="button"
-            onClick={() => setShowEmoji(v => !v)}
+            onClick={() => { setShowEmoji(v => !v); setShowGif(false); }}
             title="Emoji"
             className="text-fenr-muted hover:text-fenr-orange transition-colors mb-0.5 text-xl leading-none"
           >

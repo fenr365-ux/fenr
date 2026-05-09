@@ -12,6 +12,11 @@ import messageRoutes from './routes/messages.js';
 import botRoutes from './routes/bots.js';
 import voiceRoutes from './routes/voice.js';
 import dmRoutes from './routes/dms.js';
+import rolesRoutes from './routes/roles.js';
+import moderationRoutes from './routes/moderation.js';
+import pinsRoutes from './routes/pins.js';
+import searchRoutes from './routes/search.js';
+import gifsRoutes from './routes/gifs.js';
 import { handleBuiltinCommand } from './bots/builtinBots.js';
 
 dotenv.config();
@@ -36,6 +41,11 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/bots', botRoutes);
 app.use('/api/voice', voiceRoutes);
 app.use('/api/dms', dmRoutes);
+app.use('/api/roles', rolesRoutes);
+app.use('/api/moderation', moderationRoutes);
+app.use('/api/pins', pinsRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/gifs', gifsRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'FENR' }));
 
@@ -159,6 +169,37 @@ io.on('connection', (socket) => {
 
     io.to(channelId).emit('reaction_update', { messageId, reactions: reactions || [] });
   });
+
+  // Thread reply
+  socket.on('send_thread_reply', async ({ threadId, channelId, content }) => {
+    if (!threadId || !content?.trim()) return;
+
+    const { data: message, error } = await supabase
+      .from('messages')
+      .insert({
+        channel_id: channelId,
+        user_id: socket.user.id,
+        content: content.trim(),
+        thread_id: threadId,
+        attachments: []
+      })
+      .select('*, profiles(id, username, avatar_url)')
+      .single();
+
+    if (!error && message) {
+      // Increment reply count on parent
+      await supabase.rpc('increment_reply_count', { msg_id: threadId }).catch(() =>
+        supabase.from('messages').select('reply_count').eq('id', threadId).single().then(({ data }) =>
+          supabase.from('messages').update({ reply_count: (data?.reply_count || 0) + 1 }).eq('id', threadId)
+        )
+      );
+      io.to(`thread:${threadId}`).emit('new_thread_reply', { ...message, reactions: [] });
+      io.to(channelId).emit('reply_count_update', { messageId: threadId });
+    }
+  });
+
+  socket.on('join_thread', (threadId) => socket.join(`thread:${threadId}`));
+  socket.on('leave_thread', (threadId) => socket.leave(`thread:${threadId}`));
 
   // Typing indicator
   socket.on('typing', (channelId) => {

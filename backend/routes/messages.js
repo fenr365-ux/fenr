@@ -26,4 +26,16 @@ router.get('/:channelId', authenticateToken, async (req, res) => {
   res.json(data.reverse());
 });
 
+// Get thread replies for a message
+router.get('/:channelId/thread/:messageId', authenticateToken, async (req, res) => {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*, profiles(id, username, avatar_url), reactions:message_reactions(id, emoji, user_id)')
+    .eq('channel_id', req.params.channelId)
+    .eq('thread_id', req.params.messageId)
+    .order('created_at', { ascending: true });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
 export default router;

@@ -84,7 +84,7 @@ function AttachmentDisplay({ attachments }) {
   );
 }
 
-export default function Message({ message, showHeader, isOwn, currentUserId, customEmojis, onDelete, onReact, onEdit }) {
+export default function Message({ message, showHeader, isOwn, currentUserId, customEmojis, onDelete, onReact, onEdit, onPin, onThread, canModerate }) {
   const [hovered, setHovered] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -233,6 +233,24 @@ export default function Message({ message, showHeader, isOwn, currentUserId, cus
             )}
           </div>
 
+          {/* Thread reply */}
+          <button
+            onClick={() => onThread?.(message)}
+            title="Reply in Thread"
+            className="w-7 h-7 rounded hover:bg-fenr-brand/20 flex items-center justify-center text-fenr-muted hover:text-fenr-teal transition-colors text-sm"
+          >
+            💬
+          </button>
+
+          {/* Pin */}
+          <button
+            onClick={() => onPin?.(message)}
+            title="Pin Message"
+            className="w-7 h-7 rounded hover:bg-fenr-brand/20 flex items-center justify-center text-fenr-muted hover:text-fenr-orange transition-colors text-sm"
+          >
+            📌
+          </button>
+
           {/* Edit (own messages only) */}
           {isOwn && (
             <button
@@ -244,8 +262,8 @@ export default function Message({ message, showHeader, isOwn, currentUserId, cus
             </button>
           )}
 
-          {/* Delete (own messages only) */}
-          {isOwn && (
+          {/* Delete (own or mod) */}
+          {(isOwn || canModerate) && (
             <button
               onClick={() => onDelete(message.id)}
               title="Delete Message"

@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import CustomEmojiManager from '../realms/CustomEmojiManager';
 import BotDashboard from '../bots/BotDashboard';
+import RoleManager from '../roles/RoleManager';
+import ModerationPanel from '../moderation/ModerationPanel';
+import { supabase } from '../../context/AuthContext';
 
 export default function HallList({ realm, selectedHall, onSelectHall }) {
   const { session } = useAuth();
@@ -12,11 +15,23 @@ export default function HallList({ realm, selectedHall, onSelectHall }) {
   const [showInvite, setShowInvite] = useState(false);
   const [showEmojiManager, setShowEmojiManager] = useState(false);
   const [showBotDashboard, setShowBotDashboard] = useState(false);
+  const [showRoleManager, setShowRoleManager] = useState(false);
+  const [showModPanel, setShowModPanel] = useState(false);
+  const [members, setMembers] = useState([]);
   const [copied, setCopied] = useState(false);
+  const isOwner = realm?.owner_id === session?.user?.id;
 
   useEffect(() => {
-    if (realm) loadHalls();
+    if (realm) { loadHalls(); loadMembers(); }
   }, [realm?.id]);
+
+  async function loadMembers() {
+    const { data } = await supabase
+      .from('server_members')
+      .select('role, profiles(id, username)')
+      .eq('server_id', realm.id);
+    if (data) setMembers(data.map(m => ({ ...m.profiles, role: m.role })));
+  }
 
   async function loadHalls() {
     const res = await fetch(`/api/channels/${realm.id}`, {
@@ -82,6 +97,24 @@ export default function HallList({ realm, selectedHall, onSelectHall }) {
       <div className="h-12 flex items-center justify-between px-4 flex-shrink-0 border-b" style={{ borderColor: 'rgba(74,122,255,0.1)' }}>
         <h2 className="font-display text-fenr-text truncate text-sm tracking-wide">{realm.name}</h2>
         <div className="flex items-center gap-2">
+          {isOwner && (
+            <>
+              <button
+                onClick={() => setShowModPanel(true)}
+                title="Moderation"
+                className="text-fenr-muted hover:text-fenr-red transition-colors text-base leading-none"
+              >
+                🛡️
+              </button>
+              <button
+                onClick={() => setShowRoleManager(true)}
+                title="Roles"
+                className="text-fenr-muted hover:text-fenr-brand transition-colors text-base leading-none"
+              >
+                🎭
+              </button>
+            </>
+          )}
           <button
             onClick={() => setShowBotDashboard(true)}
             title="Bot Workshop"
@@ -186,6 +219,14 @@ export default function HallList({ realm, selectedHall, onSelectHall }) {
 
       {showEmojiManager && (
         <CustomEmojiManager realm={realm} onClose={() => setShowEmojiManager(false)} />
+      )}
+
+      {showRoleManager && (
+        <RoleManager realm={realm} onClose={() => setShowRoleManager(false)} />
+      )}
+
+      {showModPanel && (
+        <ModerationPanel realm={realm} members={members} onClose={() => setShowModPanel(false)} />
       )}
 
       {/* Invite modal */}

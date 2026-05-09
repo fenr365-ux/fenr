@@ -11,11 +11,12 @@ function getColor(username) {
   return PACK_COLORS[Math.abs(h)];
 }
 
-export default function MemberList({ realm, onDMUser }) {
+export default function MemberList({ realm, onDMUser, isOwner }) {
   const { session } = useAuth();
   const socket = useSocket();
   const [members, setMembers] = useState([]);
   const [presence, setPresence] = useState({});
+  const [contextMenu, setContextMenu] = useState(null); // { member, x, y }
 
   useEffect(() => {
     if (realm) loadMembers();
@@ -31,6 +32,12 @@ export default function MemberList({ realm, onDMUser }) {
     return () => socket.off('presence_update', onPresence);
   }, [socket]);
 
+  useEffect(() => {
+    function closeMenu() { setContextMenu(null); }
+    window.addEventListener('click', closeMenu);
+    return () => window.removeEventListener('click', closeMenu);
+  }, []);
+
   async function loadMembers() {
     const { data } = await supabase
       .from('server_members')
@@ -41,7 +48,6 @@ export default function MemberList({ realm, onDMUser }) {
     if (data) {
       setMembers(data.map(m => ({ ...m.profiles, role: m.role })));
 
-      // Load presence for each member
       const ids = data.map(m => m.profiles?.id).filter(Boolean);
       const { data: presenceData } = await supabase
         .from('presence')
@@ -63,15 +69,43 @@ export default function MemberList({ realm, onDMUser }) {
     const s = presence[userId];
     if (!s || s === 'online') return '#3ba55d';
     if (s === 'idle') return '#faa61a';
+    if (s === 'dnd') return '#ED4245';
     return '#747f8d';
+  }
+
+  function handleRightClick(e, member) {
+    if (member.id === session.user.id) return;
+    e.preventDefault();
+    setContextMenu({ member, x: e.clientX, y: e.clientY });
+  }
+
+  async function contextKick(member) {
+    if (!confirm(`Kick ${member.username}?`)) return;
+    await fetch(`/api/moderation/${realm.id}/kick/${member.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${session.access_token}` }
+    });
+    setMembers(prev => prev.filter(m => m.id !== member.id));
+    setContextMenu(null);
+  }
+
+  async function contextBan(member) {
+    if (!confirm(`Ban ${member.username}?`)) return;
+    await fetch(`/api/moderation/${realm.id}/ban/${member.id}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}` }
+    });
+    setMembers(prev => prev.filter(m => m.id !== member.id));
+    setContextMenu(null);
   }
 
   function renderMember(member) {
     return (
       <div
         key={member.id}
-        className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-fenr-hover transition-colors group cursor-pointer"
+        className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-fenr-hover transition-colors group cursor-pointer select-none"
         onClick={() => member.id !== session.user.id && onDMUser?.(member.id)}
+        onContextMenu={e => handleRightClick(e, member)}
         title={member.id !== session.user.id ? `DM ${member.username}` : 'You'}
       >
         <div className="relative flex-shrink-0">
@@ -112,6 +146,41 @@ export default function MemberList({ realm, onDMUser }) {
           </p>
           {offline.map(renderMember)}
         </>
+      )}
+
+      {/* Right-click context menu */}
+      {contextMenu && (
+        <div
+          className="fixed glass rounded-lg shadow-xl py-1 z-50 w-44"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="px-3 py-2 border-b" style={{ borderColor: 'rgba(74,122,255,0.1)' }}>
+            <p className="text-fenr-text text-sm font-semibold">{contextMenu.member.username}</p>
+          </div>
+          <button
+            onClick={() => { onDMUser?.(contextMenu.member.id); setContextMenu(null); }}
+            className="w-full text-left px-3 py-2 text-fenr-text hover:bg-fenr-hover text-sm transition-colors"
+          >
+            Send Message
+          </button>
+          {isOwner && contextMenu.member.role !== 'owner' && (
+            <>
+              <button
+                onClick={() => contextKick(contextMenu.member)}
+                className="w-full text-left px-3 py-2 text-fenr-orange hover:bg-fenr-orange/10 text-sm transition-colors"
+              >
+                Kick Member
+              </button>
+              <button
+                onClick={() => contextBan(contextMenu.member)}
+                className="w-full text-left px-3 py-2 text-fenr-red hover:bg-fenr-red/10 text-sm transition-colors"
+              >
+                Ban Member
+              </button>
+            </>
+          )}
+        </div>
       )}
     </div>
   );

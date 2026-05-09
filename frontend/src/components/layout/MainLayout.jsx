@@ -105,7 +105,7 @@ export default function MainLayout() {
               isVoiceHall ? (
                 <VoiceChannel hall={selectedHall} />
               ) : (
-                <ChatArea hall={selectedHall} serverId={selectedRealm?.id} />
+                <ChatArea hall={selectedHall} serverId={selectedRealm?.id} isOwner={selectedRealm?.owner_id === session?.user?.id} />
               )
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-fenr-muted h-full gap-3">
@@ -120,7 +120,7 @@ export default function MainLayout() {
           {/* Member list — only show in realm view on larger screens */}
           {view === 'realms' && selectedRealm && selectedHall && !isVoiceHall && (
             <div className="hidden lg:flex flex-col flex-shrink-0 border-l" style={{ borderColor: 'rgba(74,122,255,0.1)' }}>
-              <MemberList realm={selectedRealm} onDMUser={handleDMUser} />
+              <MemberList realm={selectedRealm} onDMUser={handleDMUser} isOwner={selectedRealm?.owner_id === session?.user?.id} />
             </div>
           )}
         </div>
