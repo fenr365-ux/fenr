@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['fenr-icon.svg', 'apple-touch-icon.png'],
+      includeAssets: ['fenr-icon.svg', 'apple-touch-icon.png', 'favicon.png'],
       manifest: {
         name: 'FENR — Unleash Your Voice',
         short_name: 'FENR',
